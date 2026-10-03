@@ -1,1 +1,90 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AIZEN SMP — Security Dashboard</title><style>*{box-sizing:border-box}body{margin:0;background:#08090d;color:#f5f5f5;font-family:Inter,system-ui,Arial}header{padding:24px 5%;border-bottom:1px solid #222;background:#0d0f15;display:flex;justify-content:space-between;align-items:center}h1{margin:0;font-size:24px}.live{color:#55e38b}.wrap{max-width:1400px;margin:auto;padding:28px 5%}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}.card{background:#11141b;border:1px solid #252a35;border-radius:14px;padding:20px}.num{font-size:32px;font-weight:800;margin-top:8px}.danger{color:#ff6262}.warn{color:#ffc857}.wide{grid-column:1/-1}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px;border-bottom:1px solid #242832;font-size:14px}th{color:#9da5b5}.pill{padding:4px 9px;border-radius:999px;background:#262b36}.toolbar{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}button{background:#e9b949;border:0;padding:10px 15px;border-radius:9px;font-weight:700;cursor:pointer}input{background:#11141b;border:1px solid #303644;color:white;padding:10px;border-radius:9px}.muted{color:#9da5b5}.empty{text-align:center;padding:30px;color:#8e96a6}@media(max-width:850px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:520px){.grid{grid-template-columns:1fr}}</style></head><body><header><div><h1>⚔ AIZEN SMP</h1><div class="muted">Security & Server Dashboard</div></div><b class="live">● LIVE</b></header><main class="wrap"><div class="toolbar"><input id="api" placeholder="API URL (optional)" value="/api/stats"><button onclick="loadData()">Refresh</button></div><div class="grid"><div class="card"><div class="muted">Players Online</div><div id="online" class="num">—</div></div><div class="card"><div class="muted">Hack Flags</div><div id="flags" class="num danger">—</div></div><div class="card"><div class="muted">Kicks</div><div id="kicks" class="num warn">—</div></div><div class="card"><div class="muted">Bans</div><div id="bans" class="num danger">—</div></div><div class="card wide"><h2>⚠ Anti-Cheat Events</h2><table><thead><tr><th>Time</th><th>Player</th><th>Detection</th><th>Action</th></tr></thead><tbody id="events"></tbody></table></div><div class="card wide"><h2>👥 Players</h2><table><thead><tr><th>Player</th><th>Status</th><th>Last Detection</th><th>Violations</th></tr></thead><tbody id="players"></tbody></table></div></div></main><script>const demo={online:0,flags:0,kicks:0,bans:0,events:[],players:[]};async function loadData(){let url=document.getElementById('api').value.trim();let d=demo;try{let r=await fetch(url,{cache:'no-store'});if(r.ok)d=await r.json()}catch(e){}for(const k of ['online','flags','kicks','bans'])document.getElementById(k).textContent=d[k]??0;document.getElementById('events').innerHTML=(d.events||[]).map(x=>'<tr><td>'+esc(x.time)+'</td><td>'+esc(x.player)+'</td><td><span class="pill">'+esc(x.detection)+'</span></td><td>'+esc(x.action)+'</td></tr>').join('')||'<tr><td colspan="4" class="empty">No events</td></tr>';document.getElementById('players').innerHTML=(d.players||[]).map(x=>'<tr><td>'+esc(x.player)+'</td><td>'+esc(x.status)+'</td><td>'+esc(x.lastDetection||'—')+'</td><td>'+esc(x.violations??0)+'</td></tr>').join('')||'<tr><td colspan="4" class="empty">No player data</td></tr>'}function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}loadData();setInterval(loadData,10000);</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#07080c">
+<title>AIZEN SMP — Command Center</title>
+<style>
+:root{--bg:#06070a;--panel:#0c0f15;--panel2:#10141c;--line:#202631;--text:#f7f8fb;--muted:#7f899a;--gold:#f4c95d;--gold2:#ffe7a0;--green:#52e59a;--red:#ff5f6d;--orange:#ffb84d;--blue:#65a7ff;--shadow:0 20px 60px #0008}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 80% -10%,#3b2b0d33,transparent 35%),radial-gradient(circle at 0% 30%,#14203344,transparent 30%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:linear-gradient(#fff 1px,transparent 1px),linear-gradient(90deg,#fff 1px,transparent 1px);background-size:42px 42px}
+header{position:sticky;top:0;z-index:20;height:76px;padding:0 5%;border-bottom:1px solid #ffffff0b;background:#080a0ee8;backdrop-filter:blur(18px);display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:13px}.logo{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:linear-gradient(145deg,#fff1b8,#c99220);color:#08090b;font-size:21px;font-weight:950;box-shadow:0 0 30px #f4c95d22}.brand h1{margin:0;font-size:17px;letter-spacing:2px}.brand small{display:block;color:var(--muted);margin-top:3px;font-size:11px}
+.live{display:flex;align-items:center;gap:9px;color:var(--green);font-size:12px;font-weight:800;letter-spacing:1.2px}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 14px var(--green);animation:pulse 1.7s infinite}@keyframes pulse{50%{opacity:.35;transform:scale(.75)}}
+.wrap{max-width:1500px;margin:auto;padding:38px 5% 70px}.hero{display:flex;justify-content:space-between;gap:25px;align-items:end;margin-bottom:28px}.hero h2{font-size:clamp(28px,4vw,46px);margin:0;letter-spacing:-1.8px}.hero p{margin:9px 0 0;color:var(--muted)}.sync{font-size:12px;color:var(--muted);text-align:right}.sync b{color:var(--text)}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}.api{flex:1;min-width:240px;background:var(--panel);border:1px solid var(--line);color:white;padding:12px 14px;border-radius:11px;outline:none}.api:focus{border-color:#f4c95d77;box-shadow:0 0 0 3px #f4c95d10}button{background:linear-gradient(135deg,#ffe29a,#dca52f);color:#0a0b0e;border:0;padding:12px 17px;border-radius:11px;font-weight:900;cursor:pointer;box-shadow:0 8px 25px #f4c95d18}button:hover{transform:translateY(-1px);filter:brightness(1.05)}button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line);box-shadow:none}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.card{position:relative;overflow:hidden;background:linear-gradient(145deg,#11151d,#0b0e13);border:1px solid var(--line);border-radius:18px;padding:21px;box-shadow:0 12px 35px #0003}.card:after{content:"";position:absolute;width:120px;height:120px;border-radius:50%;right:-70px;top:-70px;background:#fff;opacity:.015}.stat{min-height:135px}.stat .label{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:.5px}.num{font-size:38px;line-height:1;font-weight:950;margin-top:14px;letter-spacing:-1px}.sub{margin-top:12px;font-size:11px;color:var(--muted)}.green{color:var(--green)}.danger{color:var(--red)}.warn{color:var(--orange)}.blue{color:var(--blue)}
+.wide{grid-column:1/-1}.section-title{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:18px}.section-title h3{margin:0;font-size:17px}.badge{font-size:10px;padding:6px 9px;border-radius:999px;background:#171c25;border:1px solid var(--line);color:var(--muted)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 12px;border-bottom:1px solid #1b2029;font-size:13px}th{color:#727d8e;font-size:11px;text-transform:uppercase;letter-spacing:.8px}tbody tr:hover{background:#ffffff03}.pill{display:inline-flex;padding:5px 9px;border-radius:999px;background:#171c25;border:1px solid #252c38;font-size:11px;font-weight:800}.action{color:#c9d0dc}.empty{text-align:center!important;padding:38px!important;color:#626d7d}
+.status{display:inline-flex;align-items:center;gap:7px}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 9px var(--green)}
+.search{background:var(--panel);border:1px solid var(--line);color:#fff;padding:9px 11px;border-radius:9px;outline:none;max-width:230px}.foot{margin-top:20px;text-align:center;color:#4f5867;font-size:11px}.error{color:var(--red)!important}
+@media(max-width:1000px){.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:620px){header{padding:0 4%;height:68px}.wrap{padding:25px 4% 50px}.hero{align-items:start;flex-direction:column}.sync{text-align:left}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.search{max-width:none;width:100%}th,td{padding:11px 7px}.hide-mobile{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="logo">A</div><div><h1>AIZEN SMP</h1><small>SECURITY COMMAND CENTER</small></div></div>
+  <div class="live"><span class="dot"></span><span id="connection">LIVE</span></div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div><h2>Server Command Center</h2><p>Real-time server activity, security events and player monitoring.</p></div>
+    <div class="sync">LAST SYNC<br><b id="lastSync">—</b></div>
+  </section>
+
+  <div class="toolbar">
+    <input class="api" id="api" value="/api/stats" aria-label="API URL">
+    <button onclick="loadData()">↻ Refresh</button>
+    <button class="secondary" onclick="document.getElementById('api').value='/api/stats';loadData()">Reset API</button>
+  </div>
+
+  <div class="grid">
+    <div class="card stat"><div class="label">PLAYERS ONLINE</div><div id="online" class="num green">—</div><div class="sub">Current connected players</div></div>
+    <div class="card stat"><div class="label">SECURITY FLAGS</div><div id="flags" class="num danger">—</div><div class="sub">Reported anti-cheat events</div></div>
+    <div class="card stat"><div class="label">KICKS</div><div id="kicks" class="num warn">—</div><div class="sub">Recorded kick events</div></div>
+    <div class="card stat"><div class="label">BANS</div><div id="bans" class="num danger">—</div><div class="sub">Recorded ban events</div></div>
+
+    <div class="card wide">
+      <div class="section-title"><h3>⚡ Security Activity</h3><span id="eventCount" class="badge">0 EVENTS</span></div>
+      <table><thead><tr><th>Time</th><th>Player</th><th>Detection</th><th>Action</th></tr></thead><tbody id="events"></tbody></table>
+    </div>
+
+    <div class="card wide">
+      <div class="section-title"><h3>◈ Player Monitor</h3><input id="playerSearch" class="search" placeholder="Search player..." oninput="renderPlayers()"></div>
+      <table><thead><tr><th>Player</th><th>Status</th><th class="hide-mobile">Last Detection</th><th>Violations</th></tr></thead><tbody id="players"></tbody></table>
+    </div>
+  </div>
+  <div class="foot">AIZEN SMP • Security Command Center • Auto-refresh every 10 seconds</div>
+</main>
+
+<script>
+const demo={online:0,flags:0,kicks:0,bans:0,events:[],players:[]};
+let state=demo,lastPlayers=[];
+async function loadData(){
+  const url=document.getElementById('api').value.trim()||'/api/stats';
+  let d=demo,ok=false;
+  try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json();ok=true}
+  catch(e){document.getElementById('connection').textContent='OFFLINE';document.getElementById('connection').className='error'}
+  if(ok){document.getElementById('connection').textContent='LIVE';document.getElementById('connection').className='';}
+  state=d||demo;lastPlayers=state.players||[];
+  for(const k of ['online','flags','kicks','bans'])document.getElementById(k).textContent=state[k]??0;
+  document.getElementById('eventCount').textContent=(state.events||[]).length+' EVENTS';
+  document.getElementById('lastSync').textContent=new Date().toLocaleTimeString();
+  renderEvents();renderPlayers();
+}
+function renderEvents(){
+ const rows=(state.events||[]).map(x=>'<tr><td>'+esc(x.time||'—')+'</td><td>'+esc(x.player||'—')+'</td><td><span class="pill">'+esc(x.detection||x.type||'Event')+'</span></td><td class="action">'+esc(x.action||'Recorded')+'</td></tr>').join('');
+ document.getElementById('events').innerHTML=rows||'<tr><td colspan="4" class="empty">No security events recorded</td></tr>';
+}
+function renderPlayers(){
+ const q=(document.getElementById('playerSearch').value||'').toLowerCase();
+ const rows=lastPlayers.filter(x=>String(x.player||'').toLowerCase().includes(q)).map(x=>'<tr><td><b>'+esc(x.player||'—')+'</b></td><td><span class="status">'+esc(x.status||'Online')+'</span></td><td class="hide-mobile">'+esc(x.lastDetection||'—')+'</td><td><span class="pill">'+esc(x.violations??0)+'</span></td></tr>').join('');
+ document.getElementById('players').innerHTML=rows||'<tr><td colspan="4" class="empty">No player data</td></tr>';
+}
+function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+loadData();setInterval(loadData,10000);
+</script>
+</body>
+</html>
