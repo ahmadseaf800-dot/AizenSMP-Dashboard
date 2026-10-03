@@ -134,7 +134,7 @@ async function serverAction(action){
     return {action,status:cancelled.length?"stopping":"already-stopped",cancelled:cancelled.map(x=>x.id)};
   }
   const cancelled=await cancelActive();
-  for(let i=0;i<10;i++){
+  for(let i=0;i<30;i++){
     await new Promise(r=>setTimeout(r,1000));
     const check=await getWorkflowRuns();
     if(!check.active.length)break;
