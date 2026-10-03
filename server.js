@@ -5,7 +5,7 @@ const path=require("path");
 const root=__dirname;
 const port=process.env.PORT||3000;
 const apiToken=process.env.DASHBOARD_API_TOKEN||"";
-const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[]};
+const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],serverOnline:false,lastHeartbeat:null};
 
 function send(res,status,data,type="application/json"){
   res.writeHead(status,{"Content-Type":type,"Access-Control-Allow-Origin":"*","Cache-Control":"no-store"});
@@ -17,7 +17,8 @@ function addEvent(event){
     time:event.time||new Date().toISOString(),
     player:event.player||"Unknown",
     detection:event.detection||event.type||"Server",
-    action:event.action||"Logged"
+    action:event.action||"Logged",
+    reason:event.reason||""
   });
   state.events=state.events.slice(0,500);
 }
@@ -34,7 +35,12 @@ function body(req){
 }
 http.createServer(async(req,res)=>{
   if(req.method==="OPTIONS"){res.writeHead(204,{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"Content-Type, Authorization"});return res.end();}
-  if(req.method==="GET"&&req.url==="/api/stats")return send(res,200,state);
+  if(req.method==="GET"&&req.url==="/api/stats"){
+    const heartbeat=state.lastHeartbeat?Date.now()-new Date(state.lastHeartbeat).getTime():Infinity;
+    state.serverOnline=heartbeat<30000;
+    if(!state.serverOnline){state.online=0;state.players=[];}
+    return send(res,200,state);
+  }
   if(req.method==="POST"&&req.url==="/api/event"){
     if(!auth(req))return send(res,401,{error:"Unauthorized"});
     try{
@@ -42,6 +48,8 @@ http.createServer(async(req,res)=>{
       if(e.type==="stats"){
         state.online=Number(e.online||0);
         if(Array.isArray(e.players))state.players=e.players.slice(0,500);
+        state.serverOnline=true;
+        state.lastHeartbeat=e.time||new Date().toISOString();
       }else{
         if(e.type==="flag")state.flags++;
         if(e.type==="kick")state.kicks++;
