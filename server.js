@@ -163,7 +163,7 @@ const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,"http://localhost");
   try{
     if(url.pathname==="/api/stats"&&req.method==="GET"){
-      if(!auth(req))return send(res,401,{error:"Unauthorized"});
+      if(!secureAuth(req,adminToken))return send(res,401,{error:"Unauthorized"});
       rebuildAggregateState();
       return send(res,200,state);
     }
