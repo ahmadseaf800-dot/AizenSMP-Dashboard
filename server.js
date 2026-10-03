@@ -5,7 +5,7 @@ const path=require("path");
 const root=__dirname;
 const port=process.env.PORT||3000;
 const apiToken=process.env.DASHBOARD_API_TOKEN||"";
-const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],serverOnline:false,lastHeartbeat:null};
+const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],admins:[],serverOnline:false,lastHeartbeat:null};
 
 function send(res,status,data,type="application/json"){
   res.writeHead(status,{"Content-Type":type,"Access-Control-Allow-Origin":"*","Cache-Control":"no-store"});
@@ -48,6 +48,7 @@ http.createServer(async(req,res)=>{
       if(e.type==="stats"){
         state.online=Number(e.online||0);
         if(Array.isArray(e.players))state.players=e.players.slice(0,500);
+        if(Array.isArray(e.admins))state.admins=e.admins.slice(0,200);
         state.serverOnline=true;
         state.lastHeartbeat=e.time||new Date().toISOString();
       }else{
