@@ -52,6 +52,10 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 12p
     </div>
 
     <div class="card wide">
+      <div class="section-title"><h3>◈ Admin & Staff Monitor</h3><span id="adminCount" class="badge">0 STAFF</span></div><table><thead><tr><th>Player</th><th>OP</th><th>Role</th><th>Permissions</th></tr></thead><tbody id="admins"></tbody></table>
+    </div>
+
+    <div class="card wide">
       <div class="section-title"><h3>◈ Player Monitor</h3><input id="playerSearch" class="search" placeholder="Search player..." oninput="renderPlayers()"></div>
       <table><thead><tr><th>Player</th><th>Status</th><th class="hide-mobile">Last Detection</th><th>Violations</th></tr></thead><tbody id="players"></tbody></table>
     </div>
@@ -68,15 +72,17 @@ async function loadData(){
   try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json();ok=true}
   catch(e){document.getElementById('connection').textContent='OFFLINE';document.getElementById('connection').className='error'}
   if(ok){const online=!!d.serverOnline;document.getElementById('connection').textContent=online?'LIVE':'OFFLINE';document.getElementById('connection').className=online?'':'error';document.getElementById('serverStatus').textContent=online?'ONLINE':'OFFLINE';document.getElementById('serverStatus').className='num '+(online?'green':'danger');document.getElementById('serverInfo').textContent=online?'Heartbeat active • '+(d.online??0)+' players':'No heartbeat from the Minecraft server';document.getElementById('serverDot').style.background=online?'var(--green)':'var(--red)';}
-  state=d||demo;lastPlayers=state.players||[];
+  state=d||demo;lastPlayers=state.players||[];renderAdmins();
   for(const k of ['online','flags','kicks','bans'])document.getElementById(k).textContent=state[k]??0;
   document.getElementById('eventCount').textContent=(state.events||[]).length+' EVENTS';
   document.getElementById('lastSync').textContent=new Date().toLocaleTimeString();
   renderEvents();renderPlayers();
 }
 function renderEvents(){
- const rows=(state.events||[]).map(x=>'<tr><td>'+esc(x.time||'—')+'</td><td>'+esc(x.player||'—')+'</td><td><span class="pill">'+esc(x.detection||x.type||'Event')+'</span></td><td class="action">'+esc(x.action||'Recorded')+'</td><td>'+esc(x.reason||'—')+'</td></tr>').join('');
+ const rows=(state.events||[]).map(x=>'<tr><td>'+esc(x.time||'—')+'</td><td>'+esc(x.player||'—')+'</td><td><span class="pill">'+esc(x.detection||x.type||'Event')+'</span></td><td class="action">'+esc(x.action||'Recorded')+'</td><td>'+esc(x.reason||'—')+(x.duration?' • '+esc(x.duration):'')+'</td></tr>').join('');
  document.getElementById('events').innerHTML=rows||'<tr><td colspan="5" class="empty">No security events recorded</td></tr>';
+}
+function renderAdmins(){const a=state.admins||[];document.getElementById('adminCount').textContent=a.length+' STAFF';const rows=a.map(x=>'<tr><td><b>'+esc(x.player||'—')+'</b></td><td>'+((x.op)?'<span class="pill">YES</span>':'NO')+'</td><td><span class="pill">'+esc(x.role||'Staff')+'</span></td><td>'+esc((x.permissions||[]).join(', ')||'No explicit permissions')+'</td></tr>').join('');document.getElementById('admins').innerHTML=rows||'<tr><td colspan="4" class="empty">No online admins or staff detected</td></tr>';
 }
 function renderPlayers(){
  const q=(document.getElementById('playerSearch').value||'').toLowerCase();
