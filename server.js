@@ -63,10 +63,22 @@ async function cancelActive(){
 }
 async function serverAction(action){
   if(!["start","stop","restart"].includes(action))throw new Error("Invalid server action");
-  if(action==="start"){await dispatchServer();return {action,status:"starting"};}
-  if(action==="stop"){const cancelled=await cancelActive();return {action,status:"stopping",cancelled:cancelled.map(x=>x.id)};}
+  const before=await getWorkflowRuns();
+  if(action==="start"){
+    if(before.active.length)return {action,status:"already-running",runId:before.active[0].id};
+    await dispatchServer();
+    return {action,status:"starting"};
+  }
+  if(action==="stop"){
+    const cancelled=await cancelActive();
+    return {action,status:cancelled.length?"stopping":"already-stopped",cancelled:cancelled.map(x=>x.id)};
+  }
   const cancelled=await cancelActive();
-  await new Promise(r=>setTimeout(r,1500));
+  for(let i=0;i<10;i++){
+    await new Promise(r=>setTimeout(r,1000));
+    const check=await getWorkflowRuns();
+    if(!check.active.length)break;
+  }
   await dispatchServer();
   return {action,status:"restarting",cancelled:cancelled.map(x=>x.id)};
 }
