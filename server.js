@@ -9,7 +9,8 @@ const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[]};
 
 function send(res,status,data,type="application/json"){
   res.writeHead(status,{"Content-Type":type,"Access-Control-Allow-Origin":"*","Cache-Control":"no-store"});
-  if(Buffer.isBuffer(data)) return res.end(data);\n  res.end(typeof data==="string"?data:JSON.stringify(data));
+  if(Buffer.isBuffer(data)) return res.end(data);
+  res.end(typeof data==="string"?data:JSON.stringify(data));
 }
 function addEvent(event){
   state.events.unshift({
