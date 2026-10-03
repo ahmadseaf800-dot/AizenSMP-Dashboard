@@ -253,7 +253,16 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==="/api/github/status"&&req.method==="GET"){
       if(!secureAuth(req,adminToken))return send(res,401,{error:"Unauthorized"});
       if(!githubToken)return send(res,200,{configured:false,repo:githubRepo,workflow:githubWorkflow,ref:githubRef,active:false,run:null,runs:[]});
-      return send(res,200,githubStatusPayload(await getWorkflowRuns()));
+      const info=await getWorkflowRuns();
+      if(info.active.length){
+        if(state.controlStatus==="STOPPING") state.controlStatus="STOPPING";
+        else if(state.controlStatus==="RESTARTING") state.controlStatus="RESTARTING";
+        else state.controlStatus="STARTING";
+      }else if(info.latest){
+        if(["failure","cancelled","timed_out","action_required"].includes(String(info.latest.conclusion||"").toLowerCase())) state.controlStatus="OFFLINE";
+        else if(state.controlStatus==="STOPPING") state.controlStatus="OFFLINE";
+      }
+      return send(res,200,githubStatusPayload(info));
     }
     if(url.pathname==="/api/server-action"&&req.method==="POST"){
       if(!auth(req,adminToken))return send(res,401,{error:"Unauthorized"});
