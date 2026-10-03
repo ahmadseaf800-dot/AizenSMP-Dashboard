@@ -92,7 +92,17 @@ async function loadData(){
   let d=demo,ok=false;
   try{const token=document.getElementById('aiToken').value.trim();const headers=token?{'Authorization':'Bearer '+token}:{};const r=await fetch(url,{headers,cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json();ok=true}
   catch(e){document.getElementById('connection').textContent='OFFLINE';document.getElementById('connection').className='error'}
-  if(ok){const online=!!d.serverOnline;document.getElementById('connection').textContent=online?'LIVE':'OFFLINE';document.getElementById('connection').className=online?'':'error';document.getElementById('serverStatus').textContent=online?'ONLINE':'OFFLINE';document.getElementById('serverStatus').className='num '+(online?'green':'danger');document.getElementById('serverInfo').textContent=online?'Heartbeat active • '+(d.online??0)+' players':'No heartbeat from the Minecraft server';document.getElementById('serverDot').style.background=online?'var(--green)':'var(--red)';}
+  if(ok){
+ const control=String(d.controlStatus||((d.serverOnline)?'ONLINE':'OFFLINE')).toUpperCase();
+ const online=control==='ONLINE';
+ const color=online?'green':(['STARTING','STOPPING','RESTARTING'].includes(control)?'warn':'danger');
+ document.getElementById('connection').textContent=control;
+ document.getElementById('connection').className=online?'':'error';
+ document.getElementById('serverStatus').textContent=control;
+ document.getElementById('serverStatus').className='num '+color;
+ document.getElementById('serverInfo').textContent=online?'Heartbeat active • '+(d.online??0)+' players':(['STARTING','STOPPING','RESTARTING'].includes(control)?'Control operation in progress':'No heartbeat from the Minecraft server');
+ document.getElementById('serverDot').style.background=online?'var(--green)':'var(--red)';
+}
   state=d||demo;lastPlayers=state.players||[];renderAdmins();
   for(const k of ['online','flags','kicks','bans'])document.getElementById(k).textContent=state[k]??0;
   document.getElementById('eventCount').textContent=(state.events||[]).length+' EVENTS';
