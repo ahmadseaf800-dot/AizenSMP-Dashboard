@@ -61,7 +61,7 @@ function rebuildAggregateState(){
   if(activeServers.length>0) state.controlStatus="ONLINE";
   else if(!["STARTING","STOPPING","RESTARTING"].includes(state.controlStatus)) state.controlStatus="OFFLINE";
   state.lastHeartbeat=activeServers.sort((a,b)=>Date.parse(b.lastHeartbeat)-Date.parse(a.lastHeartbeat))[0]?.lastHeartbeat||null;
-}}
+}
 
 async function callAizenAI(message,snapshot=null){
   if(!aizenAISecret)throw new Error("AIZEN_DASHBOARD_SECRET is not configured");
