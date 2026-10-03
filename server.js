@@ -102,7 +102,14 @@ async function dispatchServer(){
   }catch(err){
     const msg=String(err&&err.message||"");
     if(/workflow does not have ['"]workflow_dispatch['"] trigger/i.test(msg)){
-      throw new Error("GITHUB_WORKFLOW_DISPATCH_MISSING: GitHub does not currently recognize workflow_dispatch for "+githubWorkflow+" on ref "+githubRef+".");
+      return await githubApi("/repos/"+githubRepo+"/dispatches",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          event_type:"aizensmp_start",
+          client_payload:{source:"aizen-smp-dashboard",ref:githubRef}
+        })
+      });
     }
     throw err;
   }
