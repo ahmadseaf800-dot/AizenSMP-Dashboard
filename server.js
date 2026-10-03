@@ -39,7 +39,27 @@ function queueCommand(command,source="AI"){
   const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),command:String(command),source,status:"queued",time:new Date().toISOString()};
   state.commands.push(item);state.commands=state.commands.slice(-100);return item;
 }
-function rebuildAggregateState(){\n  const now=Date.now();\n  const activeServers=Object.values(state.servers||{}).filter(s=>s.lastHeartbeat&&now-Date.parse(s.lastHeartbeat)<30000);\n  const playerMap=new Map();\n  const adminMap=new Map();\n  for(const server of activeServers){\n    for(const p of (server.players||[])){\n      const key=normalize(p.player);\n      playerMap.set(key,{...p,server:server.name,status:p.status||"Online"});\n    }\n    for(const a of (server.admins||[])){\n      const key=normalize(a.player);\n      adminMap.set(key,{...a,server:server.name});\n    }\n  }\n  state.players=[...playerMap.values()];\n  state.admins=[...adminMap.values()];\n  state.online=state.players.length;\n  state.serverOnline=activeServers.length>0;\n  state.lastHeartbeat=activeServers.sort((a,b)=>Date.parse(b.lastHeartbeat)-Date.parse(a.lastHeartbeat))[0]?.lastHeartbeat||null;\n}\n\nasync function callAizenAI(message,snapshot=null){
+function rebuildAggregateState(){
+  const now=Date.now();
+  const activeServers=Object.values(state.servers||{}).filter(s=>s.lastHeartbeat&&now-Date.parse(s.lastHeartbeat)<30000);
+  const playerMap=new Map();
+  const adminMap=new Map();
+  for(const server of activeServers){
+    for(const p of (server.players||[])){
+      const key=normalize(p.player);
+      playerMap.set(key,{...p,server:server.name,status:p.status||"Online"});
+    }
+    for(const a of (server.admins||[])){
+      const key=normalize(a.player);
+      adminMap.set(key,{...a,server:server.name});
+    }
+  }
+  state.players=[...playerMap.values()];
+  state.admins=[...adminMap.values()];
+  state.online=state.players.length;
+  state.serverOnline=activeServers.length>0;
+  state.lastHeartbeat=activeServers.sort((a,b)=>Date.parse(b.lastHeartbeat)-Date.parse(a.lastHeartbeat))[0]?.lastHeartbeat||null;
+}}\n\nasync function callAizenAI(message,snapshot=null){
   if(!aizenAISecret)throw new Error("AIZEN_DASHBOARD_SECRET is not configured");
   const r=await fetch(aizenAIUrl+"/api/dashboard-ai",{method:"POST",headers:{"Content-Type":"application/json","x-aizen-dashboard-secret":aizenAISecret},body:JSON.stringify({message,snapshot:snapshot||state})});
   const d=await r.json().catch(()=>({}));
