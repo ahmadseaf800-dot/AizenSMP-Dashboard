@@ -24,7 +24,7 @@ function addEvent(event){
   state.events.unshift({time:event.time||new Date().toISOString(),player:event.player||"Unknown",detection:event.detection||event.type||"Server",action:event.action||"Logged",reason:event.reason||"",duration:event.duration||""});
   state.events=state.events.slice(0,500);
 }
-function auth(req,token=apiToken){return !token||req.headers.authorization===`Bearer ${token}`;}
+function auth(req,token=apiToken){return !token||req.headers.authorization===`Bearer ${token}`;}\nfunction secureAuth(req,token){return Boolean(token)&&req.headers.authorization===`Bearer ${token}`;}
 function body(req){return new Promise((resolve,reject)=>{let raw="";req.on("data",c=>{raw+=c;if(raw.length>1024*1024)req.destroy();});req.on("end",()=>{try{resolve(JSON.parse(raw||"{}"))}catch(e){reject(e)}});req.on("error",reject);});}
 function normalize(s){return String(s||"").toLowerCase().replace(/[إأآ]/g,"ا").replace(/[ة]/g,"ه").trim();}
 function findPlayer(name){
