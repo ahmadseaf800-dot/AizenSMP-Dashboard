@@ -25,7 +25,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 12p
 <body>
 <header>
   <div class="brand"><div class="logo">A</div><div><h1>AIZEN SMP</h1><small>SECURITY COMMAND CENTER</small></div></div>
-  <div class="live"><span class="dot"></span><span id="connection">LIVE</span></div>
+  <div class="live"><span class="dot" id="serverDot"></span><span id="connection">CHECKING</span></div>
 </header>
 
 <main class="wrap">
@@ -40,7 +40,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 12p
     <button class="secondary" onclick="document.getElementById('api').value='/api/stats';loadData()">Reset API</button>
   </div>
 
-  <div class="grid">
+  <div class="grid"><div class="card stat"><div class="label">SERVER STATUS</div><div id="serverStatus" class="num green" style="font-size:28px">CHECKING</div><div id="serverInfo" class="sub">Waiting for heartbeat</div></div>
     <div class="card stat"><div class="label">PLAYERS ONLINE</div><div id="online" class="num green">—</div><div class="sub">Current connected players</div></div>
     <div class="card stat"><div class="label">SECURITY FLAGS</div><div id="flags" class="num danger">—</div><div class="sub">Reported anti-cheat events</div></div>
     <div class="card stat"><div class="label">KICKS</div><div id="kicks" class="num warn">—</div><div class="sub">Recorded kick events</div></div>
@@ -48,7 +48,7 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 12p
 
     <div class="card wide">
       <div class="section-title"><h3>⚡ Security Activity</h3><span id="eventCount" class="badge">0 EVENTS</span></div>
-      <table><thead><tr><th>Time</th><th>Player</th><th>Detection</th><th>Action</th></tr></thead><tbody id="events"></tbody></table>
+      <table><thead><tr><th>Time</th><th>Player</th><th>Detection</th><th>Action</th><th>Reason</th></tr></thead><tbody id="events"></tbody></table>
     </div>
 
     <div class="card wide">
@@ -67,7 +67,7 @@ async function loadData(){
   let d=demo,ok=false;
   try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json();ok=true}
   catch(e){document.getElementById('connection').textContent='OFFLINE';document.getElementById('connection').className='error'}
-  if(ok){document.getElementById('connection').textContent='LIVE';document.getElementById('connection').className='';}
+  if(ok){const online=!!d.serverOnline;document.getElementById('connection').textContent=online?'LIVE':'OFFLINE';document.getElementById('connection').className=online?'':'error';document.getElementById('serverStatus').textContent=online?'ONLINE':'OFFLINE';document.getElementById('serverStatus').className='num '+(online?'green':'danger');document.getElementById('serverInfo').textContent=online?'Heartbeat active • '+(d.online??0)+' players':'No heartbeat from the Minecraft server';document.getElementById('serverDot').style.background=online?'var(--green)':'var(--red)';}
   state=d||demo;lastPlayers=state.players||[];
   for(const k of ['online','flags','kicks','bans'])document.getElementById(k).textContent=state[k]??0;
   document.getElementById('eventCount').textContent=(state.events||[]).length+' EVENTS';
@@ -75,8 +75,8 @@ async function loadData(){
   renderEvents();renderPlayers();
 }
 function renderEvents(){
- const rows=(state.events||[]).map(x=>'<tr><td>'+esc(x.time||'—')+'</td><td>'+esc(x.player||'—')+'</td><td><span class="pill">'+esc(x.detection||x.type||'Event')+'</span></td><td class="action">'+esc(x.action||'Recorded')+'</td></tr>').join('');
- document.getElementById('events').innerHTML=rows||'<tr><td colspan="4" class="empty">No security events recorded</td></tr>';
+ const rows=(state.events||[]).map(x=>'<tr><td>'+esc(x.time||'—')+'</td><td>'+esc(x.player||'—')+'</td><td><span class="pill">'+esc(x.detection||x.type||'Event')+'</span></td><td class="action">'+esc(x.action||'Recorded')+'</td><td>'+esc(x.reason||'—')+'</td></tr>').join('');
+ document.getElementById('events').innerHTML=rows||'<tr><td colspan="5" class="empty">No security events recorded</td></tr>';
 }
 function renderPlayers(){
  const q=(document.getElementById('playerSearch').value||'').toLowerCase();
