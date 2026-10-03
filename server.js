@@ -13,7 +13,7 @@ const githubRepo=String(process.env.GITHUB_REPO||"ahmadseaf800-dot/AizenSMP").tr
 const githubWorkflow=String(process.env.GITHUB_WORKFLOW||"server.yml").trim();
 const githubRef=String(process.env.GITHUB_REF||"main").trim();
 
-const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],admins:[],servers:{},serverOnline:false,lastHeartbeat:null,commands:[],commandResults:[]};
+const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],admins:[],servers:{},serverOnline:false,controlStatus:"OFFLINE",lastHeartbeat:null,commands:[],commandResults:[]};
 
 function send(res,status,data,type="application/json"){
   res.writeHead(status,{"Content-Type":type,"Access-Control-Allow-Origin":"*","Cache-Control":"no-store","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET,POST,OPTIONS"});
@@ -58,6 +58,8 @@ function rebuildAggregateState(){
   state.admins=[...adminMap.values()];
   state.online=state.players.length;
   state.serverOnline=activeServers.length>0;
+  if(activeServers.length>0) state.controlStatus="ONLINE";
+  else if(!["STARTING","STOPPING","RESTARTING"].includes(state.controlStatus)) state.controlStatus="OFFLINE";
   state.lastHeartbeat=activeServers.sort((a,b)=>Date.parse(b.lastHeartbeat)-Date.parse(a.lastHeartbeat))[0]?.lastHeartbeat||null;
 }}
 
@@ -127,10 +129,12 @@ async function serverAction(action){
   if(action==="start"){
     if(before.active.length)return {action,status:"already-running",runId:before.active[0].id};
     await dispatchServer();
+    state.controlStatus="STARTING";
     return {action,status:"starting"};
   }
   if(action==="stop"){
     const cancelled=await cancelActive();
+    state.controlStatus=cancelled.length?"STOPPING":"OFFLINE";
     return {action,status:cancelled.length?"stopping":"already-stopped",cancelled:cancelled.map(x=>x.id)};
   }
   const cancelled=await cancelActive();
