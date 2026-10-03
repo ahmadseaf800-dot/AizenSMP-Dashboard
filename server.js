@@ -36,7 +36,7 @@ function findPlayer(name){
   return p?p.player:"";
 }
 function queueCommand(command,source="AI"){
-  const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),command:String(command),source,status:"queued",time:new Date().toISOString()};
+  const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),command:String(command),source,status:"queued",time:new Date().toISOString(),broadcast:false,claimedBy:[],completedBy:[]};
   state.commands.push(item);state.commands=state.commands.slice(-100);return item;
 }
 function rebuildAggregateState(){
@@ -184,13 +184,45 @@ const server=http.createServer(async(req,res)=>{
     if(url.pathname==="/api/commands"&&req.method==="GET"){
       if(!secureAuth(req,apiToken))return send(res,401,{error:"Unauthorized"});
       const serverName=String(url.searchParams.get("server")||"").trim();
-      const queued=state.commands.filter(x=>x.status==="queued" && (x.broadcast || !x.targetServer || x.targetServer===serverName));
-      for(const x of queued){x.status="sent";x.sentAt=new Date().toISOString();x.claimedBy=serverName||"unknown";}
+      const activeServerNames=Object.values(state.servers||{})
+        .filter(s=>s.lastHeartbeat&&Date.now()-Date.parse(s.lastHeartbeat)<30000)
+        .map(s=>s.name);
+      const queued=[];
+      for(const x of state.commands){
+        if(x.status!=="queued") continue;
+        if(x.broadcast){
+          if(!serverName || (x.claimedBy||[]).includes(serverName)) continue;
+          x.claimedBy=Array.isArray(x.claimedBy)?x.claimedBy:[];
+          x.claimedBy.push(serverName);
+          if(activeServerNames.every(name=>x.claimedBy.includes(name))) x.status="sent";
+          x.sentAt=x.sentAt||new Date().toISOString();
+          queued.push(x);
+        }else if(!x.targetServer || x.targetServer===serverName){
+          x.status="sent";x.sentAt=new Date().toISOString();x.claimedBy=[serverName||"unknown"];
+          queued.push(x);
+        }
+      }
       return send(res,200,{commands:queued,server:serverName});
     }
     if(url.pathname==="/api/command-result"&&req.method==="POST"){
       if(!secureAuth(req,apiToken))return send(res,401,{error:"Unauthorized"});
-      const e=await body(req);const item=state.commands.find(x=>x.id===e.id);if(item)item.status=e.success?"completed":"failed";state.commandResults.unshift({...e,time:new Date().toISOString()});state.commandResults=state.commandResults.slice(0,100);return send(res,200,{ok:true});
+      const e=await body(req);
+      const item=state.commands.find(x=>x.id===e.id);
+      if(item){
+        if(item.broadcast){
+          item.completedBy=Array.isArray(item.completedBy)?item.completedBy:[];
+          const server=String(e.server||"unknown");
+          if(!item.completedBy.includes(server)) item.completedBy.push(server);
+          const expected=(item.claimedBy||[]).length;
+          if(!e.success) item.status="failed";
+          else if(expected>0 && item.completedBy.length>=expected) item.status="completed";
+        }else{
+          item.status=e.success?"completed":"failed";
+        }
+      }
+      state.commandResults.unshift({...e,time:new Date().toISOString()});
+      state.commandResults=state.commandResults.slice(0,100);
+      return send(res,200,{ok:true});
     }
     if(url.pathname==="/api/ai"&&req.method==="POST"){
       if(!secureAuth(req,adminToken))return send(res,401,{error:"Unauthorized"});
