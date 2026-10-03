@@ -27,7 +27,12 @@ function addEvent(event){
 function auth(req,token=apiToken){return !token||req.headers.authorization===`Bearer ${token}`;}
 function body(req){return new Promise((resolve,reject)=>{let raw="";req.on("data",c=>{raw+=c;if(raw.length>1024*1024)req.destroy();});req.on("end",()=>{try{resolve(JSON.parse(raw||"{}"))}catch(e){reject(e)}});req.on("error",reject);});}
 function normalize(s){return String(s||"").toLowerCase().replace(/[إأآ]/g,"ا").replace(/[ة]/g,"ه").trim();}
-function findPlayer(name){const n=normalize(name);const p=state.players.find(x=>normalize(x.player)===n);return p?p.player:String(name||"");}
+function findPlayer(name){
+  const n=normalize(name);
+  const sources=[...(state.players||[]),...(state.admins||[]),...(state.events||[])];
+  const p=sources.find(x=>normalize(x.player)===n);
+  return p?p.player:"";
+}
 function queueCommand(command,source="AI"){
   const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),command:String(command),source,status:"queued",time:new Date().toISOString()};
   state.commands.push(item);state.commands=state.commands.slice(-100);return item;
@@ -65,13 +70,30 @@ function buildMinecraftCommand(action,data){
   const target=findPlayer(data.target);
   const reason=String(data.reason||"AIZEN AI").trim().slice(0,200);
   const duration=String(data.duration||"").trim().slice(0,30);
-  if(!target) throw new Error("PLAYER_REQUIRED");
+  if(!target) throw new Error("PLAYER_NOT_FOUND_IN_DASHBOARD_DATA");
   if(action==="minecraft_op") return {command:"op "+target,broadcast:true};
   if(action==="minecraft_deop") return {command:"deop "+target,broadcast:true};
   if(action==="minecraft_ban") return {command:"ban "+target+" "+reason,broadcast:true};
-  if(action==="minecraft_tempban") return {command:"tempban "+target+" "+duration+" "+reason,broadcast:true};
+  if(action==="minecraft_tempban"){
+    if(!duration) throw new Error("BAN_DURATION_REQUIRED");
+    return {command:"tempban "+target+" "+duration+" "+reason,broadcast:true};
+  }
   if(action==="minecraft_pardon") return {command:"pardon "+target,broadcast:true};
-  if(action==="minecraft_kick") return {command:"kick "+target+" "+reason,broadcast:false};
+  if(action==="minecraft_kick"){
+    const online=state.players.some(p=>normalize(p.player)===normalize(target));
+    if(!online) throw new Error("PLAYER_NOT_ONLINE");
+    return {command:"kick "+target+" "+reason,broadcast:false};
+  }
+  if(action==="minecraft_role_add"||action==="minecraft_role_remove"){
+    const role=String(data.role||"").trim();
+    const actualRoles=[...new Set((state.admins||[]).map(x=>String(x.role||"").trim()).filter(Boolean))];
+    if(!role||!actualRoles.some(x=>normalize(x)===normalize(role))) throw new Error("ROLE_NOT_PRESENT_IN_DASHBOARD_DATA");
+    const actualRole=actualRoles.find(x=>normalize(x)===normalize(role))||role;
+    const command=action==="minecraft_role_add"
+      ?"lp user "+target+" parent set "+actualRole
+      :"lp user "+target+" parent unset "+actualRole;
+    return {command,broadcast:true};
+  }
   throw new Error("UNSUPPORTED_MINECRAFT_ACTION");
 }
 
