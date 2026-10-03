@@ -84,8 +84,28 @@ async function getWorkflowRuns(){
   const active=runs.filter(x=>["queued","in_progress","waiting","requested","pending"].includes(x.status));
   return {runs,active,latest:runs[0]||null};
 }
+async function getWorkflowDefinition(){
+  const out=await githubApi("/repos/"+githubRepo+"/actions/workflows/"+encodeURIComponent(githubWorkflow));
+  return out.data||{};
+}
 async function dispatchServer(){
-  return githubApi("/repos/"+githubRepo+"/actions/workflows/"+encodeURIComponent(githubWorkflow)+"/dispatches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ref:githubRef})});
+  const workflow=await getWorkflowDefinition();
+  const workflowId=workflow.id;
+  if(!workflowId)throw new Error("GITHUB_WORKFLOW_NOT_FOUND");
+  if(String(workflow.state||"").toLowerCase()!=="active")throw new Error("GITHUB_WORKFLOW_NOT_ACTIVE");
+  try{
+    return await githubApi("/repos/"+githubRepo+"/actions/workflows/"+encodeURIComponent(String(workflowId))+"/dispatches",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({ref:githubRef})
+    });
+  }catch(err){
+    const msg=String(err&&err.message||"");
+    if(/workflow does not have ['"]workflow_dispatch['"] trigger/i.test(msg)){
+      throw new Error("GITHUB_WORKFLOW_DISPATCH_MISSING: GitHub does not currently recognize workflow_dispatch for "+githubWorkflow+" on ref "+githubRef+".");
+    }
+    throw err;
+  }
 }
 async function cancelActive(){
   const {active}=await getWorkflowRuns();
