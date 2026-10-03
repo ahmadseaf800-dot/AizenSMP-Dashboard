@@ -6,12 +6,17 @@ const root=__dirname;
 const port=process.env.PORT||3000;
 const apiToken=process.env.DASHBOARD_API_TOKEN||"";
 const adminToken=process.env.DASHBOARD_ADMIN_TOKEN||apiToken;
-const aizenAIUrl=String(process.env.AIZEN_AI_BUILDER_URL||"https://aizen-ai-builder.onrender.com").replace(/\\/$/,"");
+const aizenAIUrl=String(process.env.AIZEN_AI_BUILDER_URL||"https://aizen-ai-builder.onrender.com").replace(/\/$/,"");
 const aizenAISecret=String(process.env.AIZEN_DASHBOARD_SECRET||"");
+const githubToken=String(process.env.GITHUB_TOKEN||"").trim();
+const githubRepo=String(process.env.GITHUB_REPO||"ahmadseaf800-dot/AizenSMP").trim();
+const githubWorkflow=String(process.env.GITHUB_WORKFLOW||"server.yml").trim();
+const githubRef=String(process.env.GITHUB_REF||"main").trim();
+
 const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],admins:[],serverOnline:false,lastHeartbeat:null,commands:[],commandResults:[]};
 
 function send(res,status,data,type="application/json"){
-  res.writeHead(status,{"Content-Type":type,"Access-Control-Allow-Origin":"*","Cache-Control":"no-store","Access-Control-Allow-Headers":"Content-Type, Authorization"});
+  res.writeHead(status,{"Content-Type":type,"Access-Control-Allow-Origin":"*","Cache-Control":"no-store","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET,POST,OPTIONS"});
   if(Buffer.isBuffer(data)) return res.end(data);
   res.end(typeof data==="string"?data:JSON.stringify(data));
 }
@@ -34,4 +39,94 @@ async function callAizenAI(message){
   if(!r.ok)throw new Error(d.message||d.error||"Aizen AI request failed");
   return d;
 }
-;
+async function githubApi(endpoint,options={}){
+  if(!githubToken)throw new Error("GITHUB_TOKEN is not configured");
+  const r=await fetch("https://api.github.com"+endpoint,{...options,headers:{"Accept":"application/vnd.github+json","Authorization":"Bearer "+githubToken,"X-GitHub-Api-Version":"2022-11-28",...(options.headers||{})}});
+  const raw=await r.text();let data={};try{data=JSON.parse(raw)}catch{}
+  if(!r.ok)throw new Error(data.message||("GitHub API HTTP "+r.status));
+  return {status:r.status,data};
+}
+async function getWorkflowRuns(){
+  const q="/repos/"+githubRepo+"/actions/workflows/"+encodeURIComponent(githubWorkflow)+"/runs?per_page=10&exclude_pull_requests=true";
+  const out=await githubApi(q);
+  const runs=Array.isArray(out.data.workflow_runs)?out.data.workflow_runs:[];
+  const active=runs.filter(x=>["queued","in_progress","waiting","requested","pending"].includes(x.status));
+  return {runs,active,latest:runs[0]||null};
+}
+async function dispatchServer(){
+  return githubApi("/repos/"+githubRepo+"/actions/workflows/"+encodeURIComponent(githubWorkflow)+"/dispatches",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({ref:githubRef})});
+}
+async function cancelActive(){
+  const {active}=await getWorkflowRuns();
+  for(const run of active)await githubApi("/repos/"+githubRepo+"/actions/runs/"+run.id+"/cancel",{method:"POST"});
+  return active;
+}
+async function serverAction(action){
+  if(!["start","stop","restart"].includes(action))throw new Error("Invalid server action");
+  if(action==="start"){await dispatchServer();return {action,status:"starting"};}
+  if(action==="stop"){const cancelled=await cancelActive();return {action,status:"stopping",cancelled:cancelled.map(x=>x.id)};}
+  const cancelled=await cancelActive();
+  await new Promise(r=>setTimeout(r,1500));
+  await dispatchServer();
+  return {action,status:"restarting",cancelled:cancelled.map(x=>x.id)};
+}
+function githubStatusPayload(info){
+  const latest=info.latest,active=info.active[0]||null;
+  return {configured:!!githubToken,repo:githubRepo,workflow:githubWorkflow,ref:githubRef,active:!!active,run:active||latest||null,runs:info.runs.slice(0,5).map(x=>({id:x.id,status:x.status,conclusion:x.conclusion,created_at:x.created_at,updated_at:x.updated_at,html_url:x.html_url}))};
+}
+function serveStatic(req,res){
+  let pathname=new URL(req.url,"http://localhost").pathname;
+  if(pathname==="/")pathname="/index.html";
+  const file=path.normalize(path.join(root,pathname));
+  if(!file.startsWith(root))return send(res,403,{error:"Forbidden"});
+  fs.readFile(file,(err,data)=>{
+    if(err)return send(res,404,{error:"Not found"});
+    const ext=path.extname(file).toLowerCase();
+    const types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json; charset=utf-8",".ico":"image/x-icon"};
+    send(res,200,data,types[ext]||"application/octet-stream");
+  });
+}
+const server=http.createServer(async(req,res)=>{
+  if(req.method==="OPTIONS")return send(res,204,"");
+  const url=new URL(req.url,"http://localhost");
+  try{
+    if(url.pathname==="/api/stats"&&req.method==="GET"){
+      if(!auth(req))return send(res,401,{error:"Unauthorized"});
+      if(state.lastHeartbeat&&Date.now()-new Date(state.lastHeartbeat).getTime()>30000){state.serverOnline=false;state.online=0;state.players=[];state.admins=[];}
+      return send(res,200,state);
+    }
+    if(url.pathname==="/api/event"&&req.method==="POST"){
+      if(!auth(req))return send(res,401,{error:"Unauthorized"});
+      const e=await body(req);
+      if(e.type==="stats"){state.online=Number(e.online||0);state.players=Array.isArray(e.players)?e.players:[];state.admins=Array.isArray(e.admins)?e.admins:[];state.serverOnline=true;state.lastHeartbeat=e.time||new Date().toISOString();}
+      else if(e.type==="flag"){state.flags++;addEvent(e);const p=findPlayer(e.player);const target=state.players.find(x=>normalize(x.player)===normalize(p));if(target){target.violations=Number(target.violations||0)+1;target.lastDetection=e.detection||"Security Flag";}}
+      else if(e.type==="kick"){state.kicks++;addEvent(e);}
+      else if(e.type==="ban"){state.bans++;addEvent(e);}
+      else addEvent(e);
+      return send(res,200,{ok:true});
+    }
+    if(url.pathname==="/api/commands"&&req.method==="GET"){
+      if(!auth(req))return send(res,401,{error:"Unauthorized"});
+      const queued=state.commands.filter(x=>x.status==="queued");for(const x of queued)x.status="sent";return send(res,200,{commands:queued});
+    }
+    if(url.pathname==="/api/command-result"&&req.method==="POST"){
+      if(!auth(req))return send(res,401,{error:"Unauthorized"});
+      const e=await body(req);const item=state.commands.find(x=>x.id===e.id);if(item)item.status=e.success?"completed":"failed";state.commandResults.unshift({...e,time:new Date().toISOString()});state.commandResults=state.commandResults.slice(0,100);return send(res,200,{ok:true});
+    }
+    if(url.pathname==="/api/ai"&&req.method==="POST"){
+      if(!auth(req,adminToken))return send(res,401,{error:"Unauthorized"});
+      const e=await body(req);if(!e.message)return send(res,400,{error:"message is required"});const out=await callAizenAI(String(e.message));let command=null;if(out.command)command=queueCommand(out.command,"Aizen AI");return send(res,200,{reply:out.reply||"تمت المعالجة.",command});
+    }
+    if(url.pathname==="/api/github/status"&&req.method==="GET"){
+      if(!auth(req,adminToken))return send(res,401,{error:"Unauthorized"});
+      if(!githubToken)return send(res,200,{configured:false,repo:githubRepo,workflow:githubWorkflow,ref:githubRef,active:false,run:null,runs:[]});
+      return send(res,200,githubStatusPayload(await getWorkflowRuns()));
+    }
+    if(url.pathname==="/api/server-action"&&req.method==="POST"){
+      if(!auth(req,adminToken))return send(res,401,{error:"Unauthorized"});
+      const e=await body(req);return send(res,200,{ok:true,...await serverAction(String(e.action||""))});
+    }
+    return serveStatic(req,res);
+  }catch(err){console.error(err);return send(res,500,{error:err.message||"Internal server error"});}
+});
+server.listen(port,()=>console.log("AIZEN SMP Dashboard listening on "+port));
