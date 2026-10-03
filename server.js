@@ -13,7 +13,7 @@ const githubRepo=String(process.env.GITHUB_REPO||"ahmadseaf800-dot/AizenSMP").tr
 const githubWorkflow=String(process.env.GITHUB_WORKFLOW||"server.yml").trim();
 const githubRef=String(process.env.GITHUB_REF||"main").trim();
 
-const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],admins:[],serverOnline:false,lastHeartbeat:null,commands:[],commandResults:[]};
+const state={online:0,flags:0,kicks:0,bans:0,events:[],players:[],admins:[],servers:{},serverOnline:false,lastHeartbeat:null,commands:[],commandResults:[]};
 
 function send(res,status,data,type="application/json"){
   res.writeHead(status,{"Content-Type":type,"Access-Control-Allow-Origin":"*","Cache-Control":"no-store","Access-Control-Allow-Headers":"Content-Type, Authorization","Access-Control-Allow-Methods":"GET,POST,OPTIONS"});
@@ -32,9 +32,9 @@ function queueCommand(command,source="AI"){
   const item={id:Date.now().toString(36)+Math.random().toString(36).slice(2,7),command:String(command),source,status:"queued",time:new Date().toISOString()};
   state.commands.push(item);state.commands=state.commands.slice(-100);return item;
 }
-async function callAizenAI(message){
+function rebuildAggregateState(){\n  const now=Date.now();\n  const activeServers=Object.values(state.servers||{}).filter(s=>s.lastHeartbeat&&now-Date.parse(s.lastHeartbeat)<30000);\n  const playerMap=new Map();\n  const adminMap=new Map();\n  for(const server of activeServers){\n    for(const p of (server.players||[])){\n      const key=normalize(p.player);\n      playerMap.set(key,{...p,server:server.name,status:p.status||"Online"});\n    }\n    for(const a of (server.admins||[])){\n      const key=normalize(a.player);\n      adminMap.set(key,{...a,server:server.name});\n    }\n  }\n  state.players=[...playerMap.values()];\n  state.admins=[...adminMap.values()];\n  state.online=state.players.length;\n  state.serverOnline=activeServers.length>0;\n  state.lastHeartbeat=activeServers.sort((a,b)=>Date.parse(b.lastHeartbeat)-Date.parse(a.lastHeartbeat))[0]?.lastHeartbeat||null;\n}\n\nasync function callAizenAI(message,snapshot=null){
   if(!aizenAISecret)throw new Error("AIZEN_DASHBOARD_SECRET is not configured");
-  const r=await fetch(aizenAIUrl+"/api/dashboard-ai",{method:"POST",headers:{"Content-Type":"application/json","x-aizen-dashboard-secret":aizenAISecret},body:JSON.stringify({message})});
+  const r=await fetch(aizenAIUrl+"/api/dashboard-ai",{method:"POST",headers:{"Content-Type":"application/json","x-aizen-dashboard-secret":aizenAISecret},body:JSON.stringify({message,snapshot:snapshot||state})});
   const d=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(d.message||d.error||"Aizen AI request failed");
   return d;
@@ -61,6 +61,20 @@ async function cancelActive(){
   for(const run of active)await githubApi("/repos/"+githubRepo+"/actions/runs/"+run.id+"/cancel",{method:"POST"});
   return active;
 }
+function buildMinecraftCommand(action,data){
+  const target=findPlayer(data.target);
+  const reason=String(data.reason||"AIZEN AI").trim().slice(0,200);
+  const duration=String(data.duration||"").trim().slice(0,30);
+  if(!target) throw new Error("PLAYER_REQUIRED");
+  if(action==="minecraft_op") return {command:"op "+target,broadcast:true};
+  if(action==="minecraft_deop") return {command:"deop "+target,broadcast:true};
+  if(action==="minecraft_ban") return {command:"ban "+target+" "+reason,broadcast:true};
+  if(action==="minecraft_tempban") return {command:"tempban "+target+" "+duration+" "+reason,broadcast:true};
+  if(action==="minecraft_pardon") return {command:"pardon "+target,broadcast:true};
+  if(action==="minecraft_kick") return {command:"kick "+target+" "+reason,broadcast:false};
+  throw new Error("UNSUPPORTED_MINECRAFT_ACTION");
+}
+
 async function serverAction(action){
   if(!["start","stop","restart"].includes(action))throw new Error("Invalid server action");
   const before=await getWorkflowRuns();
@@ -104,13 +118,13 @@ const server=http.createServer(async(req,res)=>{
   try{
     if(url.pathname==="/api/stats"&&req.method==="GET"){
       if(!auth(req))return send(res,401,{error:"Unauthorized"});
-      if(state.lastHeartbeat&&Date.now()-new Date(state.lastHeartbeat).getTime()>30000){state.serverOnline=false;state.online=0;state.players=[];state.admins=[];}
+      rebuildAggregateState();
       return send(res,200,state);
     }
     if(url.pathname==="/api/event"&&req.method==="POST"){
       if(!auth(req))return send(res,401,{error:"Unauthorized"});
       const e=await body(req);
-      if(e.type==="stats"){state.online=Number(e.online||0);state.players=Array.isArray(e.players)?e.players:[];state.admins=Array.isArray(e.admins)?e.admins:[];state.serverOnline=true;state.lastHeartbeat=e.time||new Date().toISOString();}
+      if(e.type==="stats"){\n        const serverName=String(e.server||"unknown").trim()||"unknown";\n        state.servers[serverName]={name:serverName,online:Number(e.online||0),players:Array.isArray(e.players)?e.players:[],admins:Array.isArray(e.admins)?e.admins:[],lastHeartbeat:e.time||new Date().toISOString(),status:"ONLINE"};\n        rebuildAggregateState();\n      }
       else if(e.type==="flag"){state.flags++;addEvent(e);const p=findPlayer(e.player);const target=state.players.find(x=>normalize(x.player)===normalize(p));if(target){target.violations=Number(target.violations||0)+1;target.lastDetection=e.detection||"Security Flag";}}
       else if(e.type==="kick"){state.kicks++;addEvent(e);}
       else if(e.type==="ban"){state.bans++;addEvent(e);}
