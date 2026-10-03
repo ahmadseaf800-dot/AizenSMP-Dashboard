@@ -145,7 +145,10 @@ async function askAI(){
  try{
   const r=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({message})});
   const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');
-  box.innerHTML='<b>AI:</b> '+esc(d.reply)+(d.command?' <span class="pill">QUEUED: '+esc(d.command.command)+'</span>':'');
+  const action=d.action||'none';
+  const commandInfo=d.command?'<span class="pill">QUEUED: '+esc(d.command.command)+'</span>':'';
+  const statusInfo=d.status?'<span class="pill">'+esc(String(d.status).toUpperCase())+'</span>':'';
+  box.innerHTML='<b>AIZEN AI:</b> '+esc(d.reply)+' '+statusInfo+' '+commandInfo;
   document.getElementById('aiInput').value='';
  }catch(e){box.textContent='خطأ: '+e.message;box.className='error'}
 }
