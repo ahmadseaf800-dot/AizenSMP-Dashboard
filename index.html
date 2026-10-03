@@ -40,6 +40,16 @@ table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 12p
     <button class="secondary" onclick="document.getElementById('api').value='/api/stats';loadData()">Reset API</button>
   </div>
 
+  <div class="card wide" style="margin-bottom:18px">
+    <div class="section-title"><h3>🤖 AIZEN AI SERVER CONTROL</h3><span class="badge">ADMIN ONLY</span></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <input class="api" id="aiToken" type="password" placeholder="Dashboard admin token">
+      <input class="api" id="aiInput" placeholder="مثال: بند احمد لمدة 3 ايام السبب هكر">
+      <button onclick="askAI()">Send</button>
+    </div>
+    <div id="aiReply" style="margin-top:14px;color:var(--muted)">AI جاهز. لا يتم تنفيذ أي أمر بدون التوكن الإداري.</div>
+  </div>
+
   <div class="grid"><div class="card stat"><div class="label">SERVER STATUS</div><div id="serverStatus" class="num green" style="font-size:28px">CHECKING</div><div id="serverInfo" class="sub">Waiting for heartbeat</div></div>
     <div class="card stat"><div class="label">PLAYERS ONLINE</div><div id="online" class="num green">—</div><div class="sub">Current connected players</div></div>
     <div class="card stat"><div class="label">SECURITY FLAGS</div><div id="flags" class="num danger">—</div><div class="sub">Reported anti-cheat events</div></div>
@@ -90,6 +100,18 @@ function renderPlayers(){
  document.getElementById('players').innerHTML=rows||'<tr><td colspan="4" class="empty">No player data</td></tr>';
 }
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function askAI(){
+ const message=document.getElementById('aiInput').value.trim(),token=document.getElementById('aiToken').value;
+ if(!message)return;
+ const box=document.getElementById('aiReply');box.textContent='AI يعمل...';
+ try{
+  const r=await fetch('/api/ai',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({message})});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');
+  box.innerHTML='<b>AI:</b> '+esc(d.reply)+(d.command?' <span class="pill">QUEUED: '+esc(d.command.command)+'</span>':'');
+  document.getElementById('aiInput').value='';
+ }catch(e){box.textContent='خطأ: '+e.message;box.className='error'}
+}
+document.getElementById('aiInput').addEventListener('keydown',e=>{if(e.key==='Enter')askAI();});
 loadData();setInterval(loadData,10000);
 </script>
 </body>
