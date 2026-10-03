@@ -65,10 +65,29 @@ function rebuildAggregateState(){
 
 async function callAizenAI(message,snapshot=null){
   if(!aizenAISecret)throw new Error("AIZEN_DASHBOARD_SECRET is not configured");
-  const r=await fetch(aizenAIUrl+"/api/dashboard-ai",{method:"POST",headers:{"Content-Type":"application/json","x-aizen-dashboard-secret":aizenAISecret},body:JSON.stringify({message,snapshot:snapshot||state})});
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.message||d.error||"Aizen AI request failed");
-  return d;
+  const payload=JSON.stringify({message,snapshot:snapshot||state});
+  const candidates=[aizenAIUrl,"https://aizen-ai-builder.onrender.com"]
+    .map(x=>String(x||"").replace(/\\/$/,""))
+    .filter((x,i,a)=>x&&a.indexOf(x)===i);
+  let lastError="AIZEN_AI_NOT_FOUND";
+  for(const base of candidates){
+    try{
+      const r=await fetch(base+"/api/dashboard-ai",{
+        method:"POST",
+        headers:{"Content-Type":"application/json","x-aizen-dashboard-secret":aizenAISecret},
+        body:payload
+      });
+      const raw=await r.text();
+      let d={};
+      try{d=JSON.parse(raw||"{}")}catch{}
+      if(r.ok)return d;
+      lastError=String(d.message||d.error||raw||("HTTP "+r.status)).trim();
+      if(r.status!==404)break;
+    }catch(err){
+      lastError=String(err&&err.message||err);
+    }
+  }
+  throw new Error("AIZEN AI endpoint unavailable: "+lastError);
 }
 async function githubApi(endpoint,options={}){
   if(!githubToken)throw new Error("GITHUB_TOKEN is not configured");
