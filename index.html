@@ -90,7 +90,7 @@ let state=demo,lastPlayers=[];
 async function loadData(){
   const url=document.getElementById('api').value.trim()||'/api/stats';
   let d=demo,ok=false;
-  try{const r=await fetch(url,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json();ok=true}
+  try{const token=document.getElementById('aiToken').value.trim();const headers=token?{'Authorization':'Bearer '+token}:{};const r=await fetch(url,{headers,cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json();ok=true}
   catch(e){document.getElementById('connection').textContent='OFFLINE';document.getElementById('connection').className='error'}
   if(ok){const online=!!d.serverOnline;document.getElementById('connection').textContent=online?'LIVE':'OFFLINE';document.getElementById('connection').className=online?'':'error';document.getElementById('serverStatus').textContent=online?'ONLINE':'OFFLINE';document.getElementById('serverStatus').className='num '+(online?'green':'danger');document.getElementById('serverInfo').textContent=online?'Heartbeat active • '+(d.online??0)+' players':'No heartbeat from the Minecraft server';document.getElementById('serverDot').style.background=online?'var(--green)':'var(--red)';}
   state=d||demo;lastPlayers=state.players||[];renderAdmins();
@@ -153,7 +153,7 @@ async function askAI(){
  }catch(e){box.textContent='خطأ: '+e.message;box.className='error'}
 }
 document.getElementById('aiInput').addEventListener('keydown',e=>{if(e.key==='Enter')askAI();});
-loadData();setInterval(loadData,10000);setInterval(githubStatus,10000);document.getElementById('aiToken').addEventListener('input',githubStatus);
+loadData();setInterval(loadData,10000);setInterval(githubStatus,10000);document.getElementById('aiToken').addEventListener('input',()=>{githubStatus();loadData();});
 </script>
 </body>
 </html>
