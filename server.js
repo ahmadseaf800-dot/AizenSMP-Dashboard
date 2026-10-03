@@ -59,7 +59,9 @@ function rebuildAggregateState(){
   state.online=state.players.length;
   state.serverOnline=activeServers.length>0;
   state.lastHeartbeat=activeServers.sort((a,b)=>Date.parse(b.lastHeartbeat)-Date.parse(a.lastHeartbeat))[0]?.lastHeartbeat||null;
-}}\n\nasync function callAizenAI(message,snapshot=null){
+}}
+
+async function callAizenAI(message,snapshot=null){
   if(!aizenAISecret)throw new Error("AIZEN_DASHBOARD_SECRET is not configured");
   const r=await fetch(aizenAIUrl+"/api/dashboard-ai",{method:"POST",headers:{"Content-Type":"application/json","x-aizen-dashboard-secret":aizenAISecret},body:JSON.stringify({message,snapshot:snapshot||state})});
   const d=await r.json().catch(()=>({}));
