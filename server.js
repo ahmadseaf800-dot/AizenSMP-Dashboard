@@ -31,6 +31,12 @@ function body(req){return new Promise((resolve,reject)=>{let raw="";req.on("data
 function normalize(s){return String(s||"").toLowerCase().replace(/[إأآ]/g,"ا").replace(/[ة]/g,"ه").trim();}
 function findPlayer(name){
   const n=normalize(name);
+
+  // Aizenx is the permanent OWNER/OP defined by the Minecraft server.
+  // He may be offline, so he is not required to appear in live player data
+  // before the dashboard can queue an /op or /deop command.
+  if(n==="aizenx") return "Aizenx";
+
   const sources=[...(state.players||[]),...(state.admins||[]),...(state.events||[])];
   const p=sources.find(x=>normalize(x.player)===n);
   return p?p.player:"";
